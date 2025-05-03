@@ -16,52 +16,73 @@ class OpenAIRepository:
         self.mongo_service.add_message(data)
         messages = [x["msg"] for x in self.mongo_service.get_messages(data.uid)]
         input = " ".join(messages)
-        promt_str = self.do_promt(input)
-        print(promt_str)
-        try:
-            promt_json = json.loads(promt_str)
-        except json.JSONDecodeError:
-            print(promt_str)
-            raise HTTPException(status_code=500, detail="Wrong chatgpt output")
+        promt_json = {}
+        for i in range(3):
+            promt_str = self.do_promt(input)
+            try:
+                promt_json = json.loads(promt_str)
+                break
+            except json.JSONDecodeError:
+                if i == 2:
+                    print(promt_str)
+                    return "Failed to process request"
 
-        if "error" in promt_json:
-            if promt_json["error"] == "gender":
+        if "error" in promt_json or "top" not in promt_json or "bottom" not in promt_json:
+            if "error" in promt_json and promt_json["error"] == "gender":
                 # enviar "Inclou per a quin gènere és l'outfit."
-                self.whats_service.send_msg(
-                    data.uid, "Please specify for which gender the outfit is"
-                )
-            elif promt_json["error"] == "object":
-                self.whats_service.send_msg(
-                    data.uid, "Please give more detail for the outfit description"
-                )
-                pass
-            if len(messages) > 3:
+                return "Please specify for which gender the outfit is"
+                #self.whats_service.send_msg(
+                    #data.uid, "Please specify for which gender the outfit is"
+                #)
+            elif "error" in promt_json and promt_json["error"] == "object":
+                return "Please give more detail for the outfit description"
+                #self.whats_service.send_msg(
+                    #data.uid, "Please give more detail for the outfit description"
+                #)
+            elif len(messages) > 3:
                 self.mongo_service.drop_messages(data.uid)
                 self.whats_service.send_msg(data.uid, "Too many failures, try again")
-                return "too many errors"
-
-            return "promt error"
+                return "Too many promt failures, resetting. Try again"
+            else:
+                return "Please be more specific with your request"
 
         # enviar a inditex promt_json
         # processar promt_json return
 
         # return promt_json
-        self.whats_service.send_msg(
-            data.uid, f"top: {promt_json['top']}, bottom: {promt_json['bottom']}"
-        )
         self.mongo_service.drop_messages(data.uid)
-        return "done"
+        #self.whats_service.send_msg(
+            #data.uid, f"top: {promt_json['top']}, bottom: {promt_json['bottom']}"
+        #)
+        return f"top: {promt_json['top']}, bottom: {promt_json['bottom']}"
 
     def do_promt(self, prompt: str) -> str:
-        response = self.oai_client.responses.create(
-            model="gpt-4.1-mini",
-            instructions="""You are an outfit designer. You are given constraints on which you must base your outfit.
-            From the given constraints you must deduce gender, and a top and bottom clothing items.
-            If all the necessary data is present, you return a json object containing two fields: a "top" field with
-            which contains a string of three space-separated words, "man"/"woman", the top clothing piece type and its color.
-            The second field is "bottom" and aslo contains three space-separated words: "man"/"woman", the bottom clothing piece type and its color.
-            If no gender is specified, return a json object containing an error field with "gender".
-            If no information that may be used to determine the type of outfit, return a json object containing an error field with \"outfit\"""",
+        response = self.oai_client.responses.parse(
+            model="gpt-4.1",
+            instructions="""You are an Outfit Designer. You will be given a set of plain‑text constraints describing a person and their outfit preferences.
+            Output Schema
+            Your entire response must be a single JSON object and nothing else. There are three possible cases:
+            Valid outfit
+            {
+                "top":   "<gender> <top_type> <color>",
+                "bottom":"<gender> <bottom_type> <color>"
+            }
+            <gender> is either "man" or "woman".
+            <top_type> is one of: "shirt", "blouse", "jacket", "sweater", "tank", etc.
+            <bottom_type> is one of: "pants", "shorts", "skirt", "jeans", "trousers", etc.
+            <color> is a basic color name in lowercase (e.g. "black", "red", "navy", "beige", etc.).
+            All three elements are separated by a single space; do not include extra whitespace or punctuation.
+            Missing gender
+            If the constraints do not specify “man” or “woman”, output:
+            {
+                "error": "gender"
+            }
+            Missing outfit information
+            If there is no information from which you can choose a top or bottom (e.g. no mention of style, season, formality, etc.), output:
+            {
+                "error": "outfit"
+            }
+            """,
             input=prompt,
         )
         return response.output_text

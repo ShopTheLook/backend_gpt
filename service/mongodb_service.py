@@ -7,7 +7,7 @@ class MongoDBService:
         self.mongo_repository = MongoDBRepository()
 
     def add_message(self, data: ConversationRequest):
-        self.mongo_repository.add_message(data.time, data.uid, data.message)
+        self.mongo_repository.add_message(data.timestamp, data.uid, data.message)
 
     def get_messages(self, uid: str):
         return self.mongo_repository.get_messages(uid)
