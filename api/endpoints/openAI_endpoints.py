@@ -9,7 +9,7 @@ router = APIRouter()
 async def process_conversation(data: ConversationRequest):
     service = OpenAIService()
     try:
-        service.message_logic(data)
+        return service.message_logic(data)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
