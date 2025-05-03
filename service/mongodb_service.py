@@ -12,4 +12,7 @@ class MongoDBService:
     def get_messages(self, uid: str):
         return self.mongo_repository.get_messages(uid)
 
+    def drop_messages(self, uid: str):
+        self.mongo_repository.reset_messages(uid)
+
     pass

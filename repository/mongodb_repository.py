@@ -23,4 +23,9 @@ class MongoDBRepository:
         usr_collection = db[uid]
         return usr_collection.find().sort("time", ASCENDING)
 
+    def reset_messages(self, uid: str):
+        db = self.mongo_client["u_msg"]
+        usr_collection = db[uid]
+        usr_collection.drop()
+
     pass

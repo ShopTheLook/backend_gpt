@@ -13,6 +13,10 @@ class OpenAIRepository:
     def handle_message(self, data: ConversationRequest):
         self.mongo_service.add_message(data)
         messages = [x["msg"] for x in self.mongo_service.get_messages(data.uid)]
+        if len(messages) > 3:
+            self.mongo_service.drop_messages(data.uid)
+            # wats: "Too many failures, try again"
+            return "too many errors"
         input = " ".join(messages)
         promt_str = self.do_promt(input)
         print(promt_str)
@@ -35,6 +39,7 @@ class OpenAIRepository:
         # processar promt_json return
 
         # return promt_json
+        self.mongo_service.drop_messages(data.uid)
         return "done"
 
     def do_promt(self, prompt: str) -> str:
