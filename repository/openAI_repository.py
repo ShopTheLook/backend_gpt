@@ -1,5 +1,6 @@
 from model.data_request import ConversationRequest
 from service.mongodb_service import MongoDBService
+from service.whats_service import WhatsService
 from openai import OpenAI
 import json
 from fastapi import HTTPException
@@ -9,13 +10,14 @@ class OpenAIRepository:
     def __init__(self):
         self.oai_client = OpenAI()
         self.mongo_service = MongoDBService()
+        self.whats_service = WhatsService()
 
     def handle_message(self, data: ConversationRequest):
         self.mongo_service.add_message(data)
         messages = [x["msg"] for x in self.mongo_service.get_messages(data.uid)]
         if len(messages) > 3:
             self.mongo_service.drop_messages(data.uid)
-            # wats: "Too many failures, try again"
+            self.whats_service.send_msg(data.uid, "Too many failures, try again")
             return "too many errors"
         input = " ".join(messages)
         promt_str = self.do_promt(input)
@@ -23,14 +25,19 @@ class OpenAIRepository:
         try:
             promt_json = json.loads(promt_str)
         except json.JSONDecodeError:
+            print(promt_str)
             raise HTTPException(status_code=500, detail="Wrong chatgpt output")
 
         if "error" in promt_json:
             if promt_json["error"] == "gender":
                 # enviar "Inclou per a quin gènere és l'outfit."
-                pass
+                self.whats_service.send_msg(
+                    data.uid, "Please specify for which gender the outfit is"
+                )
             elif promt_json["error"] == "object":
-                # enviar "Especifica millor com vols que sigui l'outfit"
+                self.whats_service.send_msg(
+                    data.uid, "Please give more detail for the outfit description"
+                )
                 pass
 
             return "promt error"
@@ -39,6 +46,9 @@ class OpenAIRepository:
         # processar promt_json return
 
         # return promt_json
+        self.whats_service.send_msg(
+            data.uid, f"top: {promt_json['top']}, bottom: {promt_json['bottom']}"
+        )
         self.mongo_service.drop_messages(data.uid)
         return "done"
 
