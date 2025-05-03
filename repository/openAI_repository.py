@@ -1,19 +1,26 @@
 from model.data_request import ConversationRequest
+from service.mongodb_service import MongoDBService
 from openai import OpenAI
 import json
 from fastapi import HTTPException
 
-class OpenAIRepository():
+
+class OpenAIRepository:
     def __init__(self):
         self.oai_client = OpenAI()
+        self.mongo_service = MongoDBService()
+
     def handle_message(self, data: ConversationRequest):
-        promt_str = self.do_promt(data.message)
+        self.mongo_service.add_message(data)
+        messages = [x["msg"] for x in self.mongo_service.get_messages(data.uid)]
+        input = " ".join(messages)
+        promt_str = self.do_promt(input)
         print(promt_str)
         try:
             promt_json = json.loads(promt_str)
         except json.JSONDecodeError:
             raise HTTPException(status_code=500, detail="Wrong chatgpt output")
-        
+
         if "error" in promt_json:
             if promt_json["error"] == "gender":
                 # enviar "Inclou per a quin gènere és l'outfit."
@@ -27,8 +34,9 @@ class OpenAIRepository():
         # enviar a inditex promt_json
         # processar promt_json return
 
-        #return promt_json
+        # return promt_json
         return "done"
+
     def do_promt(self, prompt: str) -> str:
         response = self.oai_client.responses.create(
             model="gpt-4.1-mini",
