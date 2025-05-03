@@ -14,7 +14,7 @@ class MongoDBRepository:
         usr_collection.insert_one(
             {
                 "msg": msg,
-                "time": datetime.now(),
+                "time": time,
             }
         )
 

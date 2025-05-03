@@ -1,8 +1,5 @@
 import requests
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class InditexRepository():
     def __init__(self):

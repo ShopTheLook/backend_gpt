@@ -1,7 +1,10 @@
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
+from dotenv import load_dotenv
 
 from api.routes import router
+
+load_dotenv()
 
 app = FastAPI(
     title="OpenAI backend",
