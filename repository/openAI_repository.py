@@ -15,12 +15,12 @@ class OpenAIRepository:
         self.inditex_service = InditexService()
 
     def handle_message(self, data: ConversationRequest):
-        self.mongo_service.add_message(data)
-        messages = [x["msg"] for x in self.mongo_service.get_messages(data.uid)]
-        input = " ".join(messages)
+        # self.mongo_service.add_message(data)
+        # messages = [x["msg"] for x in self.mongo_service.get_messages(data.uid)]
+        # input = " ".join(messages)
         promt_json = {}
         for i in range(3):
-            promt_str = self.do_promt(input)
+            promt_str = self.do_promt(data.message)
             try:
                 promt_json = json.loads(promt_str)
                 break
@@ -45,13 +45,13 @@ class OpenAIRepository:
                 # self.whats_service.send_msg(
                 # data.uid, "Please specify for which gender the outfit is"
                 # )
-            elif len(messages) > 3:
-                self.mongo_service.drop_messages(data.uid)
-                self.whats_service.send_msg(data.uid, "Too many failures, try again")
-                raise HTTPException(
-                    status_code=422,
-                    detail="Too many promt failures, resetting. Please try again",
-                )
+            # elif len(messages) > 3:
+            # self.mongo_service.drop_messages(data.uid)
+            # self.whats_service.send_msg(data.uid, "Too many failures, try again")
+            # raise HTTPException(
+            # status_code=422,
+            # detail="Too many promt failures, resetting. Please try again",
+            # )
             else:
                 raise HTTPException(
                     status_code=422, detail="Please be more specific with your request"
@@ -78,7 +78,7 @@ class OpenAIRepository:
                 "top":   "<gender> <top_type> <color>",
                 "bottom":"<gender> <bottom_type> <color>"
             }
-            <gender> is either "man" or "woman".
+            <gender> is either "man" or "woman". You can use information inside the input to infer the gender.
             <top_type> is one of: "shirt", "blouse", "jacket", "sweater", "tank", etc.
             <bottom_type> is one of: "pants", "shorts", "skirt", "jeans", "trousers", etc.
             <color> is a basic color name in lowercase (e.g. "black", "red", "navy", "beige", etc.).
@@ -94,3 +94,34 @@ class OpenAIRepository:
             input=prompt,
         )
         return response.output_text
+
+
+def img_reply_promt(client, input, img_url):
+    response = client.responses.create(
+        model="gpt-4.1",
+        input=[
+            {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": """You are given an image of a clothing item and a text description of what parts of that item to change.
+                                You must output a textual description of the clothing peiece that would result from applying all the changes in the text
+                                to the image's clothing item.""",
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_image",
+                        "image_url": img_url,
+                    },
+                    {"type": "input_text", "text": input},
+                ],
+            },
+        ],
+    )
+
+    return response.output_text
